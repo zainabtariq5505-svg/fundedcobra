@@ -14,7 +14,8 @@ import {
   MoreVertical,
   Gavel,
   ShieldHalf,
-  AlertTriangle
+  AlertTriangle,
+  BrainCircuit
 } from "lucide-react";
 
 // Mock data for initial UI
