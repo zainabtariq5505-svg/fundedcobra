@@ -1,0 +1,531 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model AdminUser {
+  id                  String    @id @default(uuid())
+  name                String
+  email               String    @unique
+  passwordHash        String
+  role                String    @default("viewer")
+  forcePasswordChange Boolean   @default(true)
+  disabled            Boolean   @default(false)
+  lastLoginAt         DateTime?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+}
+
+model AdminSessionLog {
+  id        String   @id @default(uuid())
+  userId    String   
+  action    String
+  ipAddress String?
+  createdAt DateTime @default(now())
+}
+
+model GuildSettings {
+  id                    String   @id @default(uuid())
+  guildId               String   @unique
+  prefix                String   @default("!")
+  adminRole             String?
+  supportRole           String?
+  modlogChannel         String?
+  ticketCategory        String?
+  transcriptChannel     String?
+  leadAlertChannel      String?
+  giveawayChannel       String?
+  announcementChannel   String?
+  welcomeChannel        String?
+  boosterChannel        String?
+  socialNotifierChannel String?
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+}
+
+model FeatureToggle {
+  id             String   @id @default(uuid())
+  guildId        String   @unique
+  aiSupport      Boolean  @default(false)
+  tickets        Boolean  @default(false)
+  moderation     Boolean  @default(true)
+  welcome        Boolean  @default(false)
+  autoRole       Boolean  @default(false)
+  booster        Boolean  @default(false)
+  giveaways      Boolean  @default(false)
+  announcements  Boolean  @default(false)
+  socialNotifier Boolean  @default(false)
+  xp             Boolean  @default(false)
+  inviteTracker  Boolean  @default(false)
+  funCommands    Boolean  @default(false)
+  employeeEOD    Boolean  @default(false)
+  updatedAt      DateTime @updatedAt
+}
+
+model BrandAssets {
+  id                 String   @id @default(uuid())
+  guildId            String   @unique
+  mainLogo           String?
+  loginBg            String?
+  helpBanner         String?
+  welcomeBanner      String?
+  giveawayBanner     String?
+  announcementBanner String?
+  brandColor         String?  @default("#7c3aed")
+  footerText         String?  @default("@fundedcobra")
+  updatedAt          DateTime @updatedAt
+}
+
+model MemberSnapshot {
+  id            String    @id @default(uuid())
+  userId        String    @unique
+  guildId       String
+  joinDate      DateTime
+  leaveDate     DateTime?
+  roles         String?
+  xpLevel       Int       @default(0)
+  inviteCount   Int       @default(0)
+  ticketsOpened Int       @default(0)
+  warnings      Int       @default(0)
+  leadStatus    String?
+  lastActive    DateTime?
+  updatedAt     DateTime  @updatedAt
+}
+
+model MemberJoinLog {
+  id       String   @id @default(uuid())
+  userId   String
+  guildId  String
+  joinedAt DateTime @default(now())
+}
+
+model MemberLeaveLog {
+  id      String   @id @default(uuid())
+  userId  String
+  guildId String
+  leftAt  DateTime @default(now())
+}
+
+model MessageStats {
+  id        String   @id @default(uuid())
+  userId    String
+  guildId   String
+  channelId String
+  count     Int      @default(0)
+  date      DateTime @db.Date
+}
+
+model ChannelStats {
+  id        String   @id @default(uuid())
+  guildId   String
+  channelId String
+  count     Int      @default(0)
+  date      DateTime @db.Date
+}
+
+model ModerationCase {
+  id          String   @id @default(uuid())
+  guildId     String
+  userId      String
+  moderatorId String
+  actionType  String // ban, mute, kick, warning, softban
+  reason      String?
+  duration    Int? // minutes
+  evidence    String?
+  status      String   @default("active")
+  createdAt   DateTime @default(now())
+}
+
+model Warning {
+  id          String   @id @default(uuid())
+  guildId     String
+  userId      String
+  moderatorId String
+  reason      String
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+}
+
+model Watchlist {
+  id        String   @id @default(uuid())
+  guildId   String
+  userId    String
+  reason    String
+  createdAt DateTime @default(now())
+}
+
+model Blacklist {
+  id        String   @id @default(uuid())
+  guildId   String
+  userId    String
+  reason    String
+  createdAt DateTime @default(now())
+}
+
+model Ticket {
+  id        String   @id @default(uuid())
+  guildId   String
+  userId    String
+  channelId String?
+  category  String
+  priority  String   @default("normal")
+  status    String   @default("open")
+  aiEnabled Boolean  @default(true)
+  claimedBy String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model TicketMessage {
+  id        String   @id @default(uuid())
+  ticketId  String   
+  userId    String
+  content   String
+  isBot     Boolean  @default(false)
+  createdAt DateTime @default(now())
+}
+
+model TicketTranscript {
+  id           String   @id @default(uuid())
+  ticketId     String   
+  userId       String
+  closedBy     String
+  messageCount Int
+  aiSummary    String?
+  htmlUrl      String?
+  createdAt    DateTime @default(now())
+}
+
+model TicketTag {
+  id       String @id @default(uuid())
+  ticketId String 
+  tag      String
+}
+
+model TicketSLA {
+  id       String   @id @default(uuid())
+  ticketId String   
+  dueAt    DateTime
+  breached Boolean  @default(false)
+}
+
+model Lead {
+  id            String   @id @default(uuid())
+  guildId       String
+  userId        String
+  score         Int      @default(0)
+  status        String   @default("new") // new, warm, hot
+  salesStage    String   @default("prospecting")
+  firstQuestion String?
+  lastQuestion  String?
+  sourceChannel String?
+  lastActive    DateTime @default(now())
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model LeadNote {
+  id        String   @id @default(uuid())
+  leadId    String   
+  authorId  String
+  content   String
+  createdAt DateTime @default(now())
+}
+
+model FollowUpReminder {
+  id        String   @id @default(uuid())
+  leadId    String   
+  authorId  String
+  dueAt     DateTime
+  completed Boolean  @default(false)
+  createdAt DateTime @default(now())
+}
+
+model QuestionLog {
+  id            String   @id @default(uuid())
+  guildId       String
+  userId        String
+  channelId     String
+  question      String
+  answer        String
+  intent        String?
+  confidence    Float?
+  matchedSource String?
+  sourceType    String?
+  needsHuman    Boolean  @default(false)
+  createdAt     DateTime @default(now())
+}
+
+model KnowledgeSource {
+  id        String   @id @default(uuid())
+  guildId   String
+  url       String?
+  type      String // website, manual, faq
+  status    String   @default("pending")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model KnowledgeChunk {
+  id        String   @id @default(uuid())
+  sourceId  String   
+  content   String
+  embedding String?
+  createdAt DateTime @default(now())
+}
+
+model KnowledgeGap {
+  id        String   @id @default(uuid())
+  guildId   String
+  question  String
+  frequency Int      @default(1)
+  resolved  Boolean  @default(false)
+  createdAt DateTime @default(now())
+}
+
+model Giveaway {
+  id           String   @id @default(uuid())
+  guildId      String
+  channelId    String
+  messageId    String?
+  prize        String
+  winnersCount Int      @default(1)
+  status       String   @default("active")
+  endsAt       DateTime
+  createdAt    DateTime @default(now())
+}
+
+model GiveawayEntry {
+  id         String   @id @default(uuid())
+  giveawayId String   
+  userId     String
+  bonus      Int      @default(0)
+  createdAt  DateTime @default(now())
+}
+
+model GiveawayWinner {
+  id         String   @id @default(uuid())
+  giveawayId String   
+  userId     String
+  createdAt  DateTime @default(now())
+}
+
+model Announcement {
+  id           String    @id @default(uuid())
+  guildId      String
+  channelId    String
+  title        String
+  description  String
+  type         String
+  status       String    @default("sent")
+  scheduledFor DateTime?
+  authorId     String
+  createdAt    DateTime  @default(now())
+}
+
+model SocialAccount {
+  id        String   @id @default(uuid())
+  guildId   String
+  platform  String
+  username  String
+  enabled   Boolean  @default(true)
+  createdAt DateTime @default(now())
+}
+
+model SocialPost {
+  id        String   @id @default(uuid())
+  accountId String   
+  postUrl   String
+  notified  Boolean  @default(false)
+  createdAt DateTime @default(now())
+}
+
+model SocialNotifierSettings {
+  id        String   @id @default(uuid())
+  guildId   String   @unique
+  channelId String?
+  pingRole  String?
+  reactions String?
+  updatedAt DateTime @updatedAt
+}
+
+model WelcomeSettings {
+  id        String   @id @default(uuid())
+  guildId   String   @unique
+  enabled   Boolean  @default(false)
+  channelId String?
+  message   String?
+  banner    String?
+  thumbnail String?
+  dmMessage String?
+  updatedAt DateTime @updatedAt
+}
+
+model WelcomeLog {
+  id        String   @id @default(uuid())
+  guildId   String
+  userId    String
+  createdAt DateTime @default(now())
+}
+
+model AutoRoleSettings {
+  id        String   @id @default(uuid())
+  guildId   String   @unique
+  enabled   Boolean  @default(false)
+  roleId    String?
+  delayMs   Int      @default(0)
+  updatedAt DateTime @updatedAt
+}
+
+model AutoRoleLog {
+  id        String   @id @default(uuid())
+  guildId   String
+  userId    String
+  roleId    String
+  createdAt DateTime @default(now())
+}
+
+model BoosterSettings {
+  id        String   @id @default(uuid())
+  guildId   String   @unique
+  enabled   Boolean  @default(false)
+  channelId String?
+  message   String?
+  banner    String?
+  roleId    String?
+  dmMessage String?
+  reactions String?
+  updatedAt DateTime @updatedAt
+}
+
+model BoosterLog {
+  id        String   @id @default(uuid())
+  guildId   String
+  userId    String
+  createdAt DateTime @default(now())
+}
+
+model InviteLog {
+  id        String   @id @default(uuid())
+  guildId   String
+  inviterId String
+  inviteeId String
+  code      String
+  status    String   @default("valid") // valid, left, fake
+  createdAt DateTime @default(now())
+}
+
+model InviteStats {
+  id        String   @id @default(uuid())
+  guildId   String
+  userId    String
+  valid     Int      @default(0)
+  left      Int      @default(0)
+  fake      Int      @default(0)
+  updatedAt DateTime @updatedAt
+}
+
+model UserXP {
+  id        String   @id @default(uuid())
+  guildId   String
+  userId    String
+  xp        Int      @default(0)
+  level     Int      @default(0)
+  updatedAt DateTime @updatedAt
+}
+
+model XPLog {
+  id        String   @id @default(uuid())
+  guildId   String
+  userId    String
+  amount    Int
+  reason    String
+  createdAt DateTime @default(now())
+}
+
+model CobraCoins {
+  id        String   @id @default(uuid())
+  guildId   String
+  userId    String
+  balance   Int      @default(0)
+  updatedAt DateTime @updatedAt
+}
+
+model GameStats {
+  id        String   @id @default(uuid())
+  guildId   String
+  userId    String
+  game      String
+  wins      Int      @default(0)
+  losses    Int      @default(0)
+  updatedAt DateTime @updatedAt
+}
+
+model Employee {
+  id        String   @id @default(uuid())
+  guildId   String
+  userId    String
+  name      String
+  role      String
+  createdAt DateTime @default(now())
+}
+
+model EmployeeAttendance {
+  id                String    @id @default(uuid())
+  guildId           String
+  employeeId        String    
+  userId            String
+  date              DateTime  @db.Date
+  status            String    @default("not_started") // not_started, working, on_lunch, clocked_out
+  clockInAt         DateTime?
+  lunchStartAt      DateTime?
+  lunchEndAt        DateTime?
+  clockOutAt        DateTime?
+  totalWorkMinutes  Int       @default(0)
+  totalLunchMinutes Int       @default(0)
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+}
+
+model EmployeeEOD {
+  id              String   @id @default(uuid())
+  guildId         String
+  employeeId      String   
+  userId          String
+  date            DateTime @db.Date
+  workDone        String
+  ticketsHandled  Int      @default(0)
+  leadsFollowedUp Int      @default(0)
+  issuesSolved    String?
+  blockers        String?
+  tomorrowPlan    String
+  notes           String?
+  submittedAt     DateTime @default(now())
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model StaffPerformanceSnapshot {
+  id              String   @id @default(uuid())
+  guildId         String
+  userId          String
+  date            DateTime @db.Date
+  ticketsClaimed  Int      @default(0)
+  ticketsClosed   Int      @default(0)
+  avgResponseTime Int      @default(0)
+  leadsConverted  Int      @default(0)
+  createdAt       DateTime @default(now())
+}
+
+model AdminAuditLog {
+  id        String   @id @default(uuid())
+  guildId   String?
+  adminId   String   
+  action    String
+  details   String?
+  createdAt DateTime @default(now())
+}
