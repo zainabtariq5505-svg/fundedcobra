@@ -15,7 +15,7 @@ import {
   Gavel,
   ShieldHalf,
   AlertTriangle,
-  BrainCircuit
+  Bot
 } from "lucide-react";
 
 // Mock data for initial UI
@@ -189,7 +189,7 @@ export default function ModerationCenterPage() {
         <div className="space-y-6">
           <div className="p-6 rounded-2xl bg-[#111116] border border-white/5">
             <h3 className="text-lg font-semibold text-white flex items-center gap-2 mb-4">
-              <BrainCircuit className="text-purple-400" size={20} />
+              <Bot className="text-purple-400" size={20} />
               AutoMod Status
             </h3>
             
