@@ -1,0 +1,35 @@
+{
+  "name": "fundedcobra-discord-bot",
+  "version": "1.0.0",
+  "description": "FundedCobra premium Discord AI support bot with RAG knowledge base",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "node --watch src/index.js",
+    "postinstall": "prisma generate",
+    "db:migrate": "prisma migrate dev --name init",
+    "db:push": "prisma db push",
+    "db:studio": "prisma studio",
+    "db:generate": "prisma generate",
+    "db:use-mongo": "node src/scripts/switchDatabase.js mongo",
+    "db:use-sqlite": "node src/scripts/switchDatabase.js sqlite",
+    "deploy:commands": "node src/scripts/deploySlashCommands.js"
+  },
+  "dependencies": {
+    "@prisma/client": "^5.22.0",
+    "axios": "^1.7.9",
+    "cheerio": "^1.0.0",
+    "csv-stringify": "^6.5.1",
+    "discord.js": "^14.16.3",
+    "dotenv": "^16.4.7",
+    "openai": "^4.73.0",
+    "prisma": "^5.22.0",
+    "winston": "^3.17.0"
+  },
+  "devDependencies": {},
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "license": "UNLICENSED",
+  "private": true
+}

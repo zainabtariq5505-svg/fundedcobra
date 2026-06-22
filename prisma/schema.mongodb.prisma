@@ -1,0 +1,298 @@
+// FundedCobra Discord Bot — MongoDB Schema
+// To use: copy this file over prisma/schema.prisma, then run:
+//   npm run db:push          (no migrations with MongoDB — use db push)
+//   npm run db:generate
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mongodb"
+  url      = env("DATABASE_URL")
+}
+
+// Per-guild bot configuration
+model GuildSettings {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  guildId     String   @unique
+  prefix      String   @default("!")
+  adminRoleId String?
+  supportRoleId String?
+  rulesChannelId String?
+  supportChannelId String?
+  pricingChannelId String?
+  leadChannelId String?
+  leadAlertChannelId String?
+  adminReportChannelId String?
+  ticketCategoryId String?
+  dmFollowupEnabled Boolean @default(false)
+  dmFollowupCooldownHours Int @default(24)
+  offerText   String?
+  couponText  String?
+  pricingText String?
+  accountsText String?
+  payoutsText  String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+// Premium welcome system settings
+model WelcomeSettings {
+  id                  String   @id @default(auto()) @map("_id") @db.ObjectId
+  guildId             String   @unique
+  enabled             Boolean  @default(false)
+  welcomeChannelId    String?
+  welcomeMessage      String?
+  welcomeBannerUrl    String?
+  welcomeThumbnailUrl String?
+  welcomeRoleId       String?
+  dmEnabled           Boolean  @default(false)
+  dmMessage           String?
+  button1Label        String?
+  button1Url          String?
+  button2Label        String?
+  button2Url          String?
+  button3Label        String?
+  button3Url          String?
+  button4Label        String?
+  button4Url          String?
+  button5Label        String?
+  button5Url          String?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+}
+
+// Activity log for welcome events
+model WelcomeLog {
+  id               String   @id @default(auto()) @map("_id") @db.ObjectId
+  guildId          String
+  userId           String
+  username         String
+  welcomeChannelId String?
+  dmSent           Boolean  @default(false)
+  roleAssigned     Boolean  @default(false)
+  joinedAt         DateTime
+  createdAt        DateTime @default(now())
+}
+
+// A source document (URL, manual text, file, etc.)
+model KnowledgeSource {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  type        String
+  title       String
+  url         String?
+  rawText     String?
+  contentHash String
+  importedBy  String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  chunks KnowledgeChunk[]
+}
+
+// A chunk from a source, with its embedding stored as a JSON string
+model KnowledgeChunk {
+  id         String          @id @default(auto()) @map("_id") @db.ObjectId
+  sourceId   String          @db.ObjectId
+  source     KnowledgeSource @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+  title      String
+  section    String?
+  content    String
+  embedding  String?         // JSON-serialized Float32Array for cosine similarity
+  url        String?
+  chunkIndex Int
+  createdAt  DateTime        @default(now())
+}
+
+// Historical versions of imported rules/content
+model RuleVersion {
+  id           String          @id @default(auto()) @map("_id") @db.ObjectId
+  sourceId     String          @db.ObjectId
+  source       KnowledgeSource @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+  versionNumber Int
+  contentHash  String
+  rawText      String
+  createdBy    String
+  createdAt    DateTime        @default(now())
+}
+
+// Every question the bot receives
+model QuestionLog {
+  id              String   @id @default(auto()) @map("_id") @db.ObjectId
+  guildId         String
+  channelId       String
+  userId          String
+  username        String
+  question        String
+  answer          String
+  intent          String?
+  confidence      Float?
+  matchedSourceId String?
+  matchedChunkIds String?
+  language        String?
+  createdAt       DateTime @default(now())
+}
+
+// Feedback on AI responses
+model Feedback {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  guildId     String
+  userId      String
+  username    String?
+  messageId   String?
+  question    String?
+  answer      String?
+  helpful     Boolean
+  reason      String?
+  createdAt   DateTime @default(now())
+}
+
+// Open support tickets
+model Ticket {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  guildId     String
+  channelId   String   @unique
+  openerId    String
+  openerUsername String
+  category    String
+  reason      String?
+  status      String   @default("open")
+  closedBy    String?
+  closedAt    DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+// Queue for questions that need review or an official answer
+model UnansweredQuestion {
+  id            String   @id @default(auto()) @map("_id") @db.ObjectId
+  sourceId   String
+  versionNumber Int
+  question      String
+  intent        String?
+  confidence    Float?
+  language      String?
+  status        String   @default("open")
+  officialAnswer String?
+  approvedBy    String?
+  approvedAt    DateTime?
+  sourceId      String?
+  sourceName    String?
+  sourceUrl     String?
+  createdAt     DateTime @default(now())
+}
+
+// Leads — users who show buying intent
+model Lead {
+  id            String     @id @default(auto()) @map("_id") @db.ObjectId
+  guildId       String
+  userId        String
+  username      String
+  displayName   String?
+  firstQuestion String?
+  lastQuestion  String?
+  lastAnswer    String?
+  intentSummary String?
+  status        String     @default("new")
+  score         Int        @default(0)
+  isLead        Boolean    @default(false)
+  lastFollowupAt DateTime?
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+
+  notes LeadNote[]
+
+  @@unique([guildId, userId])
+}
+
+// Notes added by admins on a lead
+model LeadNote {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  leadId    String   @db.ObjectId
+  lead      Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  note      String
+  addedBy   String
+  createdAt DateTime @default(now())
+}
+
+// Audit trail for admin actions
+model AdminAuditLog {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  guildId   String
+  adminId   String
+  action    String
+  target    String?
+  details   String?
+  createdAt DateTime @default(now())
+}
+
+model Announcement {
+  id              String    @id @default(auto()) @map("_id") @db.ObjectId
+  guildId         String
+  title           String
+  description     String
+  bannerUrl       String?
+  thumbnailUrl    String?
+  buttonLabel     String?
+  buttonUrl       String?
+  targetChannelId String?
+  pingRoleId      String?
+  announcementType String   @default("General News")
+  footerText      String    @default("@fundedcobra")
+  colorTheme      String    @default("GOLD")
+  status          String    @default("draft")
+  createdBy       String
+  sentBy          String?
+  scheduledAt     DateTime?
+  sentAt          DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+}
+
+model Giveaway {
+  id             String          @id @default(auto()) @map("_id") @db.ObjectId
+  guildId        String
+  channelId      String?
+  messageId      String?
+  createdBy      String
+  prize          String
+  description    String?
+  winnerCount    Int             @default(1)
+  status         String          @default("pending")
+  requiredRoleId String?
+  bonusRoleId    String?
+  bannerUrl      String?
+  thumbnailUrl   String?
+  startAt        DateTime        @default(now())
+  endAt          DateTime
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+
+  entries GiveawayEntry[]
+  winners GiveawayWinner[]
+}
+
+model GiveawayEntry {
+  id           String   @id @default(auto()) @map("_id") @db.ObjectId
+  giveawayId   String   @db.ObjectId
+  giveaway     Giveaway @relation(fields: [giveawayId], references: [id], onDelete: Cascade)
+  guildId      String
+  userId       String
+  username     String
+  entriesCount Int      @default(1)
+  enteredAt    DateTime @default(now())
+
+  @@unique([giveawayId, userId])
+}
+
+model GiveawayWinner {
+  id           String   @id @default(auto()) @map("_id") @db.ObjectId
+  giveawayId   String   @db.ObjectId
+  giveaway     Giveaway @relation(fields: [giveawayId], references: [id], onDelete: Cascade)
+  guildId      String
+  userId       String
+  username     String
+  wonAt        DateTime @default(now())
+  rerollNumber Int      @default(0)
+}

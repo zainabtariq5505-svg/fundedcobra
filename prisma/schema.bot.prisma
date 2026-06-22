@@ -1,0 +1,606 @@
+// FundedCobra Discord Bot — Prisma Schema
+// Default: SQLite — switch provider to "postgresql" and update DATABASE_URL to migrate
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Per-guild bot configuration
+model GuildSettings {
+  id                      String   @id @default(cuid())
+  guildId                 String   @unique
+  prefix                  String   @default("!")
+  adminRoleId             String?
+  supportRoleId           String?
+  rulesChannelId          String?
+  supportChannelId        String?
+  pricingChannelId        String?
+  leadChannelId           String?
+  leadAlertChannelId      String?
+  adminReportChannelId    String?
+  ticketCategoryId        String?
+  dmFollowupEnabled       Boolean  @default(false)
+  dmFollowupCooldownHours Int      @default(24)
+  offerText               String?
+  couponText              String?
+  pricingText             String?
+  accountsText            String?
+  payoutsText             String?
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
+}
+
+// Premium welcome system settings
+model WelcomeSettings {
+  id                  String   @id @default(cuid())
+  guildId             String   @unique
+  enabled             Boolean  @default(false)
+  welcomeChannelId    String?
+  welcomeMessage      String?
+  welcomeBannerUrl    String?
+  welcomeThumbnailUrl String?
+  welcomeRoleId       String?
+  dmEnabled           Boolean  @default(false)
+  dmMessage           String?
+  button1Label        String?
+  button1Url          String?
+  button2Label        String?
+  button2Url          String?
+  button3Label        String?
+  button3Url          String?
+  button4Label        String?
+  button4Url          String?
+  button5Label        String?
+  button5Url          String?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+}
+
+// Activity log for welcome events
+model WelcomeLog {
+  id               String   @id @default(cuid())
+  guildId          String
+  userId           String
+  username         String
+  welcomeChannelId String?
+  dmSent           Boolean  @default(false)
+  roleAssigned     Boolean  @default(false)
+  joinedAt         DateTime
+  createdAt        DateTime @default(now())
+}
+
+// A source document (URL, manual text, file, etc.)
+model KnowledgeSource {
+  id          String   @id @default(cuid())
+  guildId     String
+  type        String // url | text | markdown | json | website | manual
+  title       String
+  url         String?
+  rawText     String?
+  contentHash String // SHA-256 of raw content — prevents duplicate imports
+  importedBy  String // Discord user ID of the admin who imported
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  chunks KnowledgeChunk[]
+}
+
+// A chunk from a source, with its embedding
+model KnowledgeChunk {
+  id         String          @id @default(cuid())
+  guildId    String
+  sourceId   String
+  source     KnowledgeSource @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+  title      String
+  section    String?
+  content    String
+  embedding  String? // JSON-serialized Float32Array — cosine similarity in JS
+  url        String?
+  chunkIndex Int
+  createdAt  DateTime        @default(now())
+}
+
+// Historical versions of imported rules/content
+model RuleVersion {
+  id            String   @id @default(cuid())
+  sourceId      String
+  versionNumber Int
+  contentHash   String
+  rawText       String
+  createdBy     String
+  createdAt     DateTime @default(now())
+}
+
+// Every question the bot receives
+model QuestionLog {
+  id              String   @id @default(cuid())
+  guildId         String
+  channelId       String
+  userId          String
+  username        String
+  question        String
+  answer          String
+  intent          String?
+  confidence      Float?
+  matchedSourceId String?
+  matchedChunkIds String? // JSON array of chunk IDs
+  language        String?
+  createdAt       DateTime @default(now())
+}
+
+// Feedback on AI responses
+model Feedback {
+  id        String   @id @default(cuid())
+  guildId   String
+  userId    String
+  username  String?
+  messageId String?
+  question  String?
+  answer    String?
+  helpful   Boolean
+  reason    String?
+  createdAt DateTime @default(now())
+}
+
+// Open support tickets
+model Ticket {
+  id                String    @id @default(cuid())
+  guildId           String
+  channelId         String    @unique
+  openerId          String
+  openerUsername    String
+  category          String
+  reason            String?
+  status            String    @default("open")
+  aiEnabled         Boolean   @default(true)
+  claimedById       String?
+  claimedByUsername String?
+  claimedAt         DateTime?
+  closedBy          String?
+  closedAt          DateTime?
+  lastActivityAt    DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+}
+
+// Queue for questions that need review or an official answer
+model UnansweredQuestion {
+  id             String    @id @default(cuid())
+  guildId        String
+  userId         String?
+  username       String?
+  question       String
+  intent         String?
+  confidence     Float?
+  language       String?
+  status         String    @default("open")
+  officialAnswer String?
+  approvedBy     String?
+  approvedAt     DateTime?
+  sourceId       String?
+  sourceName     String?
+  sourceUrl      String?
+  createdAt      DateTime  @default(now())
+}
+
+// Leads — users who show buying intent
+model Lead {
+  id             String    @id @default(cuid())
+  guildId        String
+  userId         String
+  username       String
+  displayName    String?
+  firstQuestion  String?
+  lastQuestion   String?
+  lastAnswer     String?
+  intentSummary  String?
+  status         String    @default("new") // new | warm | hot | closed | ignored
+  score          Int       @default(0)
+  isLead         Boolean   @default(false)
+  lastFollowupAt DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  notes LeadNote[]
+
+  @@unique([guildId, userId])
+}
+
+// Notes added by admins on a lead
+model LeadNote {
+  id        String   @id @default(cuid())
+  leadId    String
+  lead      Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  note      String
+  addedBy   String // Discord user ID
+  createdAt DateTime @default(now())
+}
+
+// Audit trail for admin actions
+model AdminAuditLog {
+  id        String   @id @default(cuid())
+  guildId   String
+  adminId   String
+  action    String
+  target    String?
+  details   String?
+  createdAt DateTime @default(now())
+}
+
+model Announcement {
+  id               String    @id @default(cuid())
+  guildId          String
+  title            String
+  description      String
+  bannerUrl        String?
+  thumbnailUrl     String?
+  buttonLabel      String?
+  buttonUrl        String?
+  targetChannelId  String?
+  pingRoleId       String?
+  announcementType String    @default("General News")
+  footerText       String    @default("@fundedcobra")
+  colorTheme       String    @default("GOLD")
+  status           String    @default("draft")
+  createdBy        String
+  sentBy           String?
+  scheduledAt      DateTime?
+  sentAt           DateTime?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+}
+
+model Giveaway {
+  id             String   @id @default(cuid())
+  guildId        String
+  channelId      String?
+  messageId      String?
+  createdBy      String
+  prize          String
+  description    String?
+  winnerCount    Int      @default(1)
+  status         String   @default("pending")
+  requiredRoleId String?
+  bonusRoleId    String?
+  bannerUrl      String?
+  thumbnailUrl   String?
+  startAt        DateTime @default(now())
+  endAt          DateTime
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  entries GiveawayEntry[]
+  winners GiveawayWinner[]
+}
+
+model GiveawayEntry {
+  id           String   @id @default(cuid())
+  giveawayId   String
+  giveaway     Giveaway @relation(fields: [giveawayId], references: [id], onDelete: Cascade)
+  guildId      String
+  userId       String
+  username     String
+  entriesCount Int      @default(1)
+  enteredAt    DateTime @default(now())
+
+  @@unique([giveawayId, userId])
+}
+
+model GiveawayWinner {
+  id           String   @id @default(cuid())
+  giveawayId   String
+  giveaway     Giveaway @relation(fields: [giveawayId], references: [id], onDelete: Cascade)
+  guildId      String
+  userId       String
+  username     String
+  wonAt        DateTime @default(now())
+  rerollNumber Int      @default(0)
+}
+
+// ── RECOVERED MODELS ───────────────────────────────────────────────────────────
+
+model HelpMenuSettings {
+  id           String   @id @default(cuid())
+  guildId      String   @unique
+  bannerUrl    String?
+  thumbnailUrl String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model XPSettings {
+  id           String   @id @default(cuid())
+  guildId      String   @unique
+  enabled      Boolean  @default(false)
+  logChannelId String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model UserXP {
+  id        String   @id @default(cuid())
+  guildId   String
+  userId    String
+  xp        Int      @default(0)
+  level     Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([guildId, userId])
+}
+
+model XPLevelRole {
+  id        String   @id @default(cuid())
+  guildId   String
+  level     Int
+  roleId    String
+  createdAt DateTime @default(now())
+
+  @@unique([guildId, level])
+}
+
+model XPLog {
+  id        String   @id @default(cuid())
+  guildId   String
+  userId    String
+  amount    Int
+  reason    String?
+  createdAt DateTime @default(now())
+}
+
+model AutoRoleSettings {
+  id        String   @id @default(cuid())
+  guildId   String   @unique
+  roleId    String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model AutoRoleLog {
+  id           String   @id @default(cuid())
+  guildId      String
+  userId       String
+  username     String
+  roleId       String?
+  roleName     String?
+  status       String
+  errorMessage String?
+  assignedAt   DateTime @default(now())
+}
+
+model BoosterSettings {
+  id           String   @id @default(cuid())
+  guildId      String   @unique
+  logChannelId String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model BoosterLog {
+  id        String   @id @default(cuid())
+  guildId   String
+  userId    String
+  username  String
+  boostedAt DateTime @default(now())
+}
+
+model InviteSettings {
+  id           String   @id @default(cuid())
+  guildId      String   @unique
+  logChannelId String?
+  bonusEnabled Boolean  @default(false)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model InviteStats {
+  id        String   @id @default(cuid())
+  guildId   String
+  userId    String
+  regular   Int      @default(0)
+  custom    Int      @default(0)
+  fake      Int      @default(0)
+  leaves    Int      @default(0)
+  bonus     Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([guildId, userId])
+}
+
+model InviteLog {
+  id        String   @id @default(cuid())
+  guildId   String
+  inviterId String
+  invitedId String
+  code      String?
+  isFake    Boolean  @default(false)
+  createdAt DateTime @default(now())
+}
+
+model ModSettings {
+  id           String   @id @default(cuid())
+  guildId      String   @unique
+  logChannelId String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model ModerationCase {
+  id                String    @id @default(cuid())
+  guildId           String
+  caseId            Int
+  actionType        String
+  targetUserId      String
+  targetUsername    String
+  moderatorId       String
+  moderatorUsername String
+  reason            String?
+  duration          Int?
+  status            String    @default("active")
+  expiresAt         DateTime?
+  createdAt         DateTime  @default(now())
+}
+
+model Warning {
+  id        String   @id @default(cuid())
+  guildId   String
+  userId    String
+  modId     String
+  reason    String
+  createdAt DateTime @default(now())
+}
+
+model Blacklist {
+  id        String   @id @default(cuid())
+  guildId   String
+  word      String
+  addedBy   String
+  createdAt DateTime @default(now())
+
+  @@unique([guildId, word])
+}
+
+model Watchlist {
+  id        String   @id @default(cuid())
+  guildId   String
+  userId    String
+  reason    String
+  addedBy   String
+  createdAt DateTime @default(now())
+
+  @@unique([guildId, userId])
+}
+
+model SocialNotifierSettings {
+  id                    String   @id @default(cuid())
+  guildId               String   @unique
+  notificationChannelId String?
+  pingType              String?
+  pingRoleId            String?
+  youtubeBannerUrl      String?
+  youtubeThumbnailUrl   String?
+  youtubeTemplate       String?
+  xBannerUrl            String?
+  xThumbnailUrl         String?
+  xTemplate             String?
+  xBearerToken          String?
+  instagramBannerUrl    String?
+  instagramThumbnailUrl String?
+  instagramTemplate     String?
+  tiktokBannerUrl       String?
+  tiktokThumbnailUrl    String?
+  tiktokTemplate        String?
+  reactionsJson         String?
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+}
+
+model SocialAccount {
+  id                String    @id @default(cuid())
+  guildId           String
+  platform          String
+  accountName       String
+  accountHandle     String?
+  accountUrl        String?
+  externalAccountId String?
+  enabled           Boolean   @default(true)
+  lastCheckedAt     DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+}
+
+model SocialPost {
+  id               String    @id @default(cuid())
+  guildId          String
+  socialAccountId  String
+  platform         String
+  externalPostId   String
+  title            String?
+  caption          String?
+  url              String?
+  thumbnailUrl     String?
+  publishedAt      DateTime?
+  notified         Boolean   @default(false)
+  discordChannelId String?
+  discordMessageId String?
+  createdAt        DateTime  @default(now())
+
+  @@unique([socialAccountId, externalPostId])
+}
+
+model SocialNotificationLog {
+  id              String    @id @default(cuid())
+  guildId         String
+  socialAccountId String
+  platform        String
+  externalPostId  String?
+  url             String?
+  status          String
+  errorMessage    String?
+  postedAt        DateTime?
+  createdAt       DateTime  @default(now())
+}
+
+model TicketSettings {
+  id                  String   @id @default(cuid())
+  guildId             String   @unique
+  categoryId          String?
+  logChannelId        String?
+  aiEnabledByDefault  Boolean  @default(true)
+  reEnableAiOnUnclaim Boolean  @default(true)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+}
+
+model TicketClaimLog {
+  id                String   @id @default(cuid())
+  guildId           String
+  ticketId          String
+  claimedById       String
+  claimedByUsername String
+  action            String
+  claimedAt         DateTime @default(now())
+}
+
+model TicketMessage {
+  id             String   @id @default(cuid())
+  ticketId       String
+  guildId        String
+  channelId      String
+  userId         String
+  username       String
+  messageContent String
+  isStaff        Boolean  @default(false)
+  isAI           Boolean  @default(false)
+  isBot          Boolean  @default(false)
+  createdAt      DateTime @default(now())
+}
+
+model TranscriptSettings {
+  id           String   @id @default(cuid())
+  guildId      String   @unique
+  logChannelId String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model TicketTranscript {
+  id           String   @id @default(cuid())
+  guildId      String
+  ticketId     String
+  channelId    String
+  userId       String
+  username     String
+  closedBy     String?
+  messageCount Int      @default(0)
+  htmlFilePath String?
+  txtFilePath  String?
+  url          String?
+  createdAt    DateTime @default(now())
+}
